@@ -39,7 +39,7 @@ Built entirely with **SwiftUI** + **Core Bluetooth**, with no third‑party depe
 
 | 1 — Scan & inspect GATT | 2 — Clone & broadcast |
 |---|---|
-| ![Scanning and inspecting a device's services and characteristics]([docs/inspect-services.png](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing)) | ![Re-broadcasting the cloned GATT profile]([docs/broadcasting.png](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing)) |
+| ![Scanning and inspecting a device's services and characteristics]([https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing]) | ![Re-broadcasting the cloned GATT profile]([https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing]) |
 | Discovered devices are listed on the left with their **name**, **UUID**, and **signal strength (RSSI)**. Selecting one connects to it and lists every **service** and **characteristic**, including each characteristic's **properties** (Read / Write / Notify…) and inferred **access**. | Tapping **Clone** turns the app into a peripheral that re‑advertises the same services under the same name — note the **green "Broadcasting as …"** banner, the new peripheral **UUID**, and the **Stop** button. |
 
 ---
