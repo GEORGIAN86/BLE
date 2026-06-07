@@ -39,7 +39,7 @@ Built entirely with **SwiftUI** + **Core Bluetooth**, with no third‑party depe
 
 | 1 — Scan & inspect GATT | 2 — Clone & broadcast |
 |---|---|
-| [![BLUE app — scanning, inspecting a BLE device's GATT, and broadcasting a cloned profile](https://drive.google.com/thumbnail?id=1h829J3N0fY5KmdB0VLJU4zysE-wnntdF&sz=w1920)](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing)
+| [![Scanning and inspecting a BLE device's services and characteristics](https://drive.google.com/thumbnail?id=1h829J3N0fY5KmdB0VLJU4zysE-wnntdF&sz=w1920)](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing) | [![Re-broadcasting the cloned GATT profile](https://drive.google.com/thumbnail?id=1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS&sz=w1920)](https://drive.google.com/file/d/1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS/view?usp=sharing) |
 | Discovered devices are listed on the left with their **name**, **UUID**, and **signal strength (RSSI)**. Selecting one connects to it and lists every **service** and **characteristic**, including each characteristic's **properties** (Read / Write / Notify…) and inferred **access**. | Tapping **Clone** turns the app into a peripheral that re‑advertises the same services under the same name — note the **green "Broadcasting as …"** banner, the new peripheral **UUID**, and the **Stop** button. |
 
 ---
