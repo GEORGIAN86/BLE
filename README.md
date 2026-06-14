@@ -1,47 +1,26 @@
-<<<<<<< HEAD
 # BLUE — BLE Scanner, GATT Inspector & Device Cloner
 
-A SwiftUI app that scans for nearby **Bluetooth Low Energy (BLE)** devices, connects to one to inspect its full **GATT** profile (services + characteristics), and can then **clone** that profile — re‑broadcasting the same services and characteristics from your own device under the original device's name.
+A **Flutter** app that scans for nearby **Bluetooth Low Energy (BLE)** devices, connects to one to inspect its full **GATT** profile (services + characteristics), and can then **clone** that profile — re‑broadcasting the same services and characteristics from your own device under the original device's name.
 
 The app plays **both BLE roles** at once:
 
 - 🔍 **Central** (client) — scans, connects, and discovers services/characteristics.
 - 📡 **Peripheral** (server) — re‑advertises the discovered profile, impersonating the original device.
 
-Built entirely with **SwiftUI** + **Core Bluetooth**, with no third‑party dependencies.
+The UI and all application state live in **Flutter/Dart**; the BLE radio work is done natively in **Swift + Core Bluetooth** (iOS & macOS) and bridged to Flutter over **platform channels**. This is a Flutter port of the original SwiftUI app — the standalone SwiftUI sources are still included at the repository root for reference (see [Repository layout](#-repository-layout)).
 
 ---
 
 ## 🎬 Demo — Working UI
 
-<!--
-  ────────────────────────────────────────────────────────────────────────
-  ▶️  HOW TO MAKE THE VIDEO PLAY INLINE ON GITHUB  (one‑time, ~30 seconds)
-  ────────────────────────────────────────────────────────────────────────
-  GitHub will NOT render a video from a file path in the repo. To get an
-  inline player you must upload the file to GitHub once and paste the URL
-  it generates:
-
-    1. Open this README in GitHub's web editor (click the ✏️ "Edit" pencil),
-       OR open a new draft Issue (you don't have to submit it).
-    2. Drag-and-drop  docs/ble-demo.mp4  into the text box.
-    3. GitHub uploads it and inserts a link that looks like:
-         https://github.com/user-attachments/assets/xxxxxxxx-xxxx-xxxx
-    4. Copy that URL and paste it ON ITS OWN LINE where the placeholder is
-       below (replace the whole placeholder line). Commit. Done — it now
-       shows as a video player.
-  ────────────────────────────────────────────────────────────────────────
--->
-
-[https://drive.google.com/file/d/1kb1yV5EB9P2ypYYzBF4er-6CDlfTailm/view?usp=sharing]
-
+[https://drive.google.com/file/d/1kb1yV5EB9P2ypYYzBF4er-6CDlfTailm/view?usp=sharing](https://drive.google.com/file/d/1kb1yV5EB9P2ypYYzBF4er-6CDlfTailm/view?usp=sharing)
 
 ### Screenshots
 
 | 1 — Scan & inspect GATT | 2 — Clone & broadcast |
 |---|---|
 | [![Scanning and inspecting a BLE device's services and characteristics](https://drive.google.com/thumbnail?id=1h829J3N0fY5KmdB0VLJU4zysE-wnntdF&sz=w1920)](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing) | [![Re-broadcasting the cloned GATT profile](https://drive.google.com/thumbnail?id=1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS&sz=w1920)](https://drive.google.com/file/d/1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS/view?usp=sharing) |
-| Discovered devices are listed on the left with their **name**, **UUID**, and **signal strength (RSSI)**. Selecting one connects to it and lists every **service** and **characteristic**, including each characteristic's **properties** (Read / Write / Notify…) and inferred **access**. | Tapping **Clone** turns the app into a peripheral that re‑advertises the same services under the same name — note the **green "Broadcasting as …"** banner, the new peripheral **UUID**, and the **Stop** button. |
+| Discovered devices are listed in the sidebar with their **name**, **UUID**, and **signal strength (RSSI)**. Selecting one connects to it and lists every **service** and **characteristic**, including each characteristic's **properties** (Read / Write / Notify…) and inferred **access**. | Tapping **Clone** turns the app into a peripheral that re‑advertises the same services under the same name — note the **green "Broadcasting as …"** banner and the **Stop** button. |
 
 ---
 
@@ -55,7 +34,8 @@ Built entirely with **SwiftUI** + **Core Bluetooth**, with no third‑party depe
 - **iOS‑safe cloning** — automatically **skips reserved/standard service UUIDs** that iOS forbids a peripheral from advertising (Generic Access, Battery, Device Information, etc.).
 - **Read/Write backing store** — the cloned peripheral answers central read/write requests from an in‑memory value store.
 - **Clear status feedback** — Bluetooth on/off indicator, broadcast banner, and a context‑aware action button.
-- Adaptive **`NavigationSplitView`** layout (sidebar + detail) that works on iPad and Mac.
+- **Adaptive layout** — a sidebar + detail split view on wide screens (tablet/desktop) that collapses to a push‑navigation flow on phones.
+- **Cross‑platform** — runs on iOS and macOS from a single Flutter codebase.
 
 ---
 
@@ -63,152 +43,163 @@ Built entirely with **SwiftUI** + **Core Bluetooth**, with no third‑party depe
 
 BLE has two roles. A **Central** scans and connects to peripherals; a **Peripheral** advertises and exposes a GATT database. This app implements **both** so it can read a device's profile and then re‑emit it.
 
+Flutter owns the UI and state; the native Swift layer owns Core Bluetooth. They communicate over two platform channels:
+
+- **`MethodChannel("ble/methods")`** — commands flowing **Flutter → native** (`startScan`, `stopScan`, `connect`, `startClone`, `stopClone`).
+- **`EventChannel("ble/events")`** — a single multiplexed stream of state updates flowing **native → Flutter**. Each event is a map with a `type` discriminator (`state`, `devices`, `connection`, `services`, `advertising`).
+
+> **Only serializable primitives cross the channel.** Core Bluetooth objects (`CBPeripheral`, `CBService`, `CBCharacteristic`) are never sent to Dart. A characteristic's `CBCharacteristicProperties` option set is transmitted as its **raw integer bitmask**, and the human‑readable property/access lists are derived in Dart. This keeps the native layer thin and makes the property logic unit‑testable.
+
 ```mermaid
 sequenceDiagram
     actor User
-    participant UI as ContentView / DeviceDetailView
-    participant C as BLEManager (Central)
-    participant P as BLEPeripheralManager (Peripheral)
+    participant UI as Flutter UI (HomePage / DeviceDetailView)
+    participant Ctl as BleController (ChangeNotifier)
+    participant Svc as BleService (platform channels)
+    participant Nat as Native AppDelegate (Core Bluetooth)
     participant Dev as Target Device
 
     User->>UI: Tap "Start Scanning"
-    UI->>C: startScanning()
-    Dev-->>C: advertisement (didDiscover)
-    C-->>UI: @Published peripherals (name, UUID, RSSI)
+    UI->>Ctl: startScan()
+    Ctl->>Svc: startScan()
+    Svc->>Nat: MethodChannel "startScan"
+    Dev-->>Nat: advertisement (didDiscover)
+    Nat-->>Svc: EventChannel {type: "devices", ...}
+    Svc-->>Ctl: devices stream
+    Ctl-->>UI: notifyListeners() (name, UUID, RSSI)
 
     User->>UI: Select a device → "Connect & Clone"
-    UI->>C: connect(to:)
-    C->>Dev: connect + discoverServices
-    Dev-->>C: didDiscoverServices
-    C->>Dev: discoverCharacteristics(for:)
-    Dev-->>C: didDiscoverCharacteristics
-    C-->>UI: @Published services (full GATT)
+    UI->>Ctl: connect(id)
+    Ctl->>Svc: connect(id)
+    Svc->>Nat: MethodChannel "connect"
+    Nat->>Dev: connect + discover services/characteristics
+    Nat-->>Svc: EventChannel {type: "services", ...}
+    Svc-->>Ctl: services stream
+    Ctl-->>UI: full GATT rendered live
 
     User->>UI: Tap "Clone"
-    UI->>C: stopScanningKeepingResults()
-    UI->>P: startCloning(services, name)
-    P->>P: buildAndAdvertise() — skip reserved UUIDs
-    P->>P: add CBMutableService(s)
-    P->>P: startAdvertising(localName, primary UUIDs)
-    P-->>UI: @Published "Broadcasting as …"
-    Note over P,Dev: The app now appears as a BLE peripheral<br/>cloning the original device's profile.
+    UI->>Ctl: stopScan() + startClone(name)
+    Ctl->>Svc: startClone(name)
+    Svc->>Nat: MethodChannel "startClone"
+    Nat->>Nat: rebuild GATT, skip reserved UUIDs, advertise
+    Nat-->>Svc: EventChannel {type: "advertising", isAdvertising: true}
+    Svc-->>Ctl: advertising stream
+    Ctl-->>UI: green "Broadcasting as …" banner
+    Note over Nat,Dev: The app now appears as a BLE peripheral<br/>cloning the original device's profile.
 ```
 
 ---
 
-## 🗂️ Architecture & File Map
+## 🗂️ Architecture
 
-The project is four Swift files, each with a single responsibility:
+The Dart side is split into four single‑responsibility layers, plus the native bridge:
 
-| File | Role | Responsibility |
+| Layer | File(s) | Responsibility |
 |---|---|---|
-| **`BLUEApp.swift`** | App entry + main UI | `@main` app, the `ContentView` split‑view (status, device list, scan buttons), and the `Peripheral` model. |
-| **`BLEManager.swift`** | **Central** | `CBCentralManager` wrapper — scanning, connecting, and service/characteristic discovery. Publishes scan results and the connected device's GATT. |
-| **`BLEPeripheralManager.swift`** | **Peripheral** | `CBPeripheralManager` wrapper — rebuilds the discovered GATT as mutable services and advertises them (the "clone"). Handles incoming read/write/subscribe. |
-| **`DeviceDetailView.swift`** | Detail UI + models | The detail pane (device info, services list, action button) plus the `DiscoveredService` and `DiscoveredCharacteristic` models. |
+| **UI — app & list** | `lib/main.dart` | `BlueApp`, the adaptive `HomePage` split view (status row, device list, scan controls), and the narrow‑screen navigation flow. |
+| **UI — detail** | `lib/device_detail_view.dart` | The detail pane: device info, the live services/characteristics list, the broadcast banner, and the context‑aware **Connect / Clone / Stop** action button. |
+| **State** | `lib/ble_controller.dart` | `BleController` — a `ChangeNotifier` that subscribes to every `BleService` stream and exposes a single observable snapshot to the UI. |
+| **Bridge** | `lib/ble_service.dart` | `BleService` — wraps the method/event channels, sends commands, and **demultiplexes** the incoming event stream into typed Dart streams. |
+| **Models** | `lib/models.dart` | `Peripheral`, `DiscoveredService`, `DiscoveredCharacteristic`, `AdvertisingState`, and the `CharacteristicProperty` bit constants. Property/access derivation lives here. |
+| **Native** | `ios/Runner/AppDelegate.swift`, `macos/Runner/AppDelegate.swift` | Core Bluetooth **Central** (scan/connect/discover) and **Peripheral** (clone/advertise) managers, wired to the `ble/methods` and `ble/events` channels. |
 
-### Data models
+### Data models (`lib/models.dart`)
 
-```swift
-// BLUEApp.swift
-struct Peripheral: Identifiable {
-    let id: UUID          // CBPeripheral.identifier
-    let name: String      // advertised name, or "Unknown"
-    let rssi: Int         // signal strength in dBm (more negative = weaker)
+```dart
+class Peripheral {
+  final String id;    // CBPeripheral.identifier as a UUID string
+  final String name;  // advertised name or "Unknown"
+  final int rssi;     // signal strength in dBm (more negative = weaker)
 }
 
-// DeviceDetailView.swift
-struct DiscoveredService: Identifiable {
-    let id = UUID()
-    let uuid: String
-    var isPrimary: Bool = true
-    var characteristics: [DiscoveredCharacteristic]
+class DiscoveredService {
+  final String uuid;
+  final bool isPrimary;
+  final List<DiscoveredCharacteristic> characteristics;
 }
 
-struct DiscoveredCharacteristic: Identifiable {
-    let id = UUID()
-    let uuid: String
-    let properties: [String]                 // human-readable: ["Read", "Notify", …]
-    let access: [String]                     // inferred: ["Readable", "Writable", …]
-    let rawProperties: CBCharacteristicProperties   // kept so the clone can mirror them exactly
+class DiscoveredCharacteristic {
+  final String uuid;
+  final int rawProperties; // raw CBCharacteristicProperties bitmask
+  List<String> get properties; // derived: ["Read", "Notify", …]
+  List<String> get access;     // derived: ["Readable", "Writable", …]
+}
+
+class AdvertisingState {
+  final bool isAdvertising;
+  final String statusMessage; // e.g. 'Broadcasting as "…"'
 }
 ```
+
+`CharacteristicProperty` holds the raw `CBCharacteristicProperties` bit values (`read = 0x02`, `write = 0x08`, `notify = 0x10`, …) kept identical to Apple's definitions so the native clone can reconstruct the exact same option set from the integer that round‑trips over the channel.
 
 ---
 
 ## 🔄 Code Flow in Detail
 
-### 1) Central — scan → connect → discover (`BLEManager`)
+### 1) Central — scan → connect → discover
 
-1. **Init.** `BLEManager()` creates `CBCentralManager(delegate: self, queue: nil)`.
-2. **State.** `centralManagerDidUpdateState` sets `@Published isSwitchedOn = (state == .poweredOn)`, which drives the green/red status dot and enables/disables the scan buttons.
-3. **Scan.** `startScanning()` calls `scanForPeripherals(withServices: nil)` (discovers everything). `stopScanning()` stops and **clears** the list; `stopScanningKeepingResults()` stops but **keeps** the list (used right before cloning so the results don't vanish).
-4. **Discovery.** `centralManager(_:didDiscover:advertisementData:rssi:)` fires once per advertising packet. It builds a `Peripheral`, stores the underlying `CBPeripheral` in a private `discoveredPeripherals[UUID]` map (needed later to connect), and — **on the main thread** — either updates the existing entry (refreshing RSSI) or appends a new one. Doing the "already in list?" check and the mutation together on the main thread prevents the same device being added twice.
-5. **Connect.** `connect(to:)` looks up the stored `CBPeripheral`, cancels any previous connection, clears `services`, records `connectedPeripheralUUID`, sets itself as the peripheral's delegate, and calls `connect(...)`.
-6. **Service discovery.** `didConnect` → `discoverServices(nil)`. `didDiscoverServices` maps each `CBService` into a `DiscoveredService` (characteristics empty for now), then calls `discoverCharacteristics(nil, for:)` on each.
-7. **Characteristic discovery.** `didDiscoverCharacteristicsFor` maps each `CBCharacteristic` into a `DiscoveredCharacteristic`, using two helpers:
-   - `describeProperties(_:)` → readable strings like `"Read"`, `"Write Without Response"`, `"Notify"`, `"Indicate"`, `"Signed Write"`, …
-   - `deriveAccess(_:)` → infers `"Readable"`, `"Writable"`, `"Notifiable"` from the flags (a central can't see GATT permissions directly, so access is inferred from properties).
-   The raw `CBCharacteristicProperties` are retained so the clone can reproduce them. The matching service's `characteristics` array is then filled in on the main thread, and the UI updates live via `@Published services`.
-8. **Disconnect / failure.** `didFailToConnect` and `didDisconnectPeripheral` clear `connectedPeripheralUUID` when relevant.
+1. `BleService` opens the `ble/events` `EventChannel` broadcast stream on construction and demultiplexes every event by its `type` field.
+2. A `state` event drives `isBluetoothOn`, which colors the status dot and enables/disables the scan buttons.
+3. `startScan()` / `stopScan()` send method calls to native. `stopScan()` also clears the Dart‑side device list immediately for snappy UI.
+4. `devices` events arrive as a list of serialized peripherals; `BleService` maps them into `Peripheral` objects (de‑duplicated natively by identifier, with RSSI refreshed in place).
+5. `connect(id)` clears stale services in the controller, then sends `connect` to native. Native connects, discovers services and characteristics, and emits a `services` event.
+6. Each characteristic arrives as a `uuid` + `rawProperties` integer. The human‑readable `properties` and inferred `access` lists are computed **in Dart** from that bitmask (see `DiscoveredCharacteristic`).
 
-### 2) Peripheral — clone → advertise (`BLEPeripheralManager`)
+### 2) Peripheral — clone → advertise
 
-1. **Start.** `startCloning(services:name:)` stores the pending services and name; if Bluetooth is powered on it calls `buildAndAdvertise()`, otherwise it surfaces a status message (and resumes once `peripheralManagerDidUpdateState` reports `.poweredOn`).
-2. **Build.** `buildAndAdvertise()`:
-   - Tears down any prior advertising/services.
-   - For each discovered service, **skips reserved/standard UUIDs** in `reservedServiceUUIDs` (`1800`, `1801`, `180A`, `180F`, …) because iOS does **not** allow a peripheral app to advertise these.
-   - Creates a `CBMutableService` and, for each characteristic, a `CBMutableCharacteristic` that mirrors the original **properties** (read/write/writeWithoutResponse/notify/indicate) and assigns matching **permissions** (`.readable` / `.writeable`).
-   - Adds every service via `manager.add(service)`.
-   - If nothing is clonable, it reports how many standard services were skipped.
-3. **Advertise.** Each `didAdd` callback increments a counter; once **all** services are added, `startAdvertising()` is called with the local name and the **primary** service UUIDs (`CBAdvertisementDataLocalNameKey`, `CBAdvertisementDataServiceUUIDsKey`).
-4. **Confirm.** `peripheralManagerDidStartAdvertising` sets `@Published isAdvertising = true` and the status to `Broadcasting as "<name>"`, which renders the green broadcast banner.
-5. **Serve requests.** While broadcasting, the peripheral responds to centrals:
-   - `didReceiveRead` → returns the value from an in‑memory `valueStore` (or empty `Data`).
-   - `didReceiveWrite` → saves written values into `valueStore`.
-   - `didSubscribeTo` → updates the status when a central subscribes to notifications.
-6. **Stop.** `stop()` stops advertising, removes all services, and clears state.
+1. `startClone(name)` sends the advertised name to native; the native layer already holds the discovered services, so only the name needs to cross the channel.
+2. Native rebuilds the discovered profile as mutable Core Bluetooth services/characteristics, **skipping reserved/standard service UUIDs** that iOS forbids a peripheral from advertising (`1800`, `1801`, `180A`, `180F`, …), then starts advertising under the original local name.
+3. An `advertising` event (`isAdvertising`, `status`) flows back; the UI shows the green **"Broadcasting as …"** banner.
+4. While broadcasting, native serves central read/write requests from an in‑memory value store.
+5. `stopClone()` stops advertising and tears down the services.
 
-### 3) UI state machine (the action button in `DeviceDetailView`)
+### 3) UI state machine (the action button)
 
-The single toolbar button changes label/behavior based on connection and broadcast state:
+The single action button in `DeviceDetailView` changes label/behavior based on connection and broadcast state:
 
 | Condition | Button |
 |---|---|
-| Currently advertising | **Stop** → `advertiser.stop()` |
-| Connected **and** services discovered | **Clone** → `stopScanningKeepingResults()` + `startCloning(...)` |
-| Connected, services still loading | **Clone** (disabled, spinner) |
-| Not connected | **Connect & Clone** (or **Connecting…**) → `connect(to:)` |
-
-`DeviceDetailView` also renders the broadcast banner, the device's name/UUID, a "Discovering services…" progress row, and the grouped list of services/characteristics with their properties and access.
+| Currently advertising | **Stop** → `controller.stopClone()` |
+| Connected **and** services discovered | **Clone** → `stopScan()` + `startClone(name)` |
+| Connected, services still loading | spinner (disabled) |
+| Not connected | **Connect & Clone** (or **Connecting…**) → `controller.connect(id)` |
 
 ---
 
-## 📁 Project Structure
+## 📁 Repository layout
 
 ```
-BLE/
-├── BLUEApp.swift                 # @main app, ContentView (split view), Peripheral model
-├── BLEManager.swift              # Central role: scan / connect / discover
-├── BLEPeripheralManager.swift    # Peripheral role: clone / advertise
-├── DeviceDetailView.swift        # Detail UI + DiscoveredService / DiscoveredCharacteristic
-├── docs/
-│   ├── ble-demo.mp4              # Screen recording used in this README
-│   ├── inspect-services.png      # Screenshot: scan + GATT inspection
-│   └── broadcasting.png          # Screenshot: cloning / broadcasting
+ble_app/
+├── lib/
+│   ├── main.dart                 # BlueApp + adaptive HomePage (sidebar + detail)
+│   ├── device_detail_view.dart   # Detail pane + Connect/Clone/Stop action button
+│   ├── ble_controller.dart       # ChangeNotifier aggregating BleService streams
+│   ├── ble_service.dart          # Platform-channel bridge + event demultiplexing
+│   └── models.dart               # Peripheral / DiscoveredService / … + property bits
+├── ios/Runner/AppDelegate.swift  # Native Core Bluetooth bridge (iOS)
+├── macos/Runner/AppDelegate.swift# Native Core Bluetooth bridge (macOS)
+├── test/
+│   ├── channel_test.dart         # BleService channel + demux tests
+│   ├── models_test.dart          # property/access derivation tests
+│   └── widget_test.dart          # UI widget tests
+├── pubspec.yaml
 └── README.md
+│
+└── (reference) BLUEApp.swift, BLEManager.swift,
+    BLEPeripheralManager.swift, DeviceDetailView.swift
+        # The original standalone SwiftUI app this project was ported from.
 ```
-
-> ℹ️ The repository contains the four loose Swift source files. To run them, add them to a SwiftUI **App** project in Xcode (the `@main struct BLUEApp` is the entry point) — see below.
 
 ---
 
 ## 🧰 Requirements
 
-- **Xcode** (recent version) with a Swift 5.9+ toolchain.
-- **iOS 17+ / iPadOS 17+ / macOS 14+.** The UI uses `NavigationSplitView`, `LabeledContent`, and the two‑parameter `onChange(of:){ old, new in }`, which require these versions.
-- **A physical device for cloning.** The Simulator has no Bluetooth radio and **cannot advertise** as a peripheral. Scanning + cloning need a real iPhone/iPad, or a Mac (the demo was recorded on macOS).
-- A **Bluetooth usage description** in `Info.plist` (see Permissions).
+- **Flutter SDK** with Dart `^3.12.1` (see `pubspec.yaml`).
+- **Xcode** with a recent Swift toolchain (for the iOS/macOS native layer and Core Bluetooth).
+- **iOS 17+ / iPadOS 17+ / macOS 14+** targets.
+- **A physical device for cloning.** The iOS Simulator has no Bluetooth radio and **cannot advertise** as a peripheral. Scanning + cloning need a real iPhone/iPad, or a Mac.
+- A **Bluetooth usage description** in `Info.plist` (see [Permissions](#permissions)).
 - *(Optional but recommended)* a second device or a BLE scanner app (e.g. **nRF Connect** or **LightBlue**) to verify the broadcast.
 
 ---
@@ -218,34 +209,46 @@ BLE/
 ```bash
 git clone https://github.com/GEORGIAN86/BLE.git
 cd BLE
+flutter pub get
 ```
 
-1. In Xcode, create a new **iOS App** (Interface: **SwiftUI**), e.g. named `BLUE`.
-2. Delete the template's `ContentView.swift` / `App.swift`, then **add the four files** from this repo to the target:
-   `BLUEApp.swift`, `BLEManager.swift`, `BLEPeripheralManager.swift`, `DeviceDetailView.swift`.
-3. Add the Bluetooth permission (see below).
-4. Select a **real device** as the run destination, build & run, and grant Bluetooth permission when prompted.
+Run on a connected device or macOS:
 
-### Permissions (Info.plist)
+```bash
+flutter devices          # list available targets
+flutter run -d <device>  # e.g. an attached iPhone, or 'macos'
+```
 
-Add a Bluetooth usage string, or iOS will terminate the app on launch:
+> Build & run on a **real device** for the full scan + clone experience; the Simulator cannot advertise.
+
+### Permissions
+
+Add a Bluetooth usage string, or iOS will terminate the app on launch (`ios/Runner/Info.plist`):
 
 ```xml
 <key>NSBluetoothAlwaysUsageDescription</key>
 <string>BLUE uses Bluetooth to scan, inspect, and clone nearby BLE devices.</string>
 ```
 
-*(For older OS targets you may also add `NSBluetoothPeripheralUsageDescription`.)*
+On macOS, enable the Bluetooth capability in the Runner target's entitlements.
+
+### Running the tests
+
+```bash
+flutter test
+```
+
+The test suite covers the channel bridge/demultiplexing (`channel_test.dart`), the property/access derivation in the models (`models_test.dart`), and the UI (`widget_test.dart`).
 
 ---
 
 ## 📖 Usage Walkthrough
 
-1. **Launch** the app. The top of the sidebar shows a **green dot / "Bluetooth is ON"** once the radio is ready.
+1. **Launch** the app. The sidebar shows a **green dot / "Bluetooth is ON"** once the radio is ready.
 2. Tap **Start Scanning**. Nearby devices populate the list with **name**, **UUID**, and **RSSI (dBm)**.
 3. **Select** a device. The detail pane shows its info and begins **discovering services**; once done it lists every service and characteristic with **Properties** and **Access**.
-4. If not yet connected, tap **Connect & Clone**. (The list highlights the connected device with a green ✓.)
-5. Once services are listed, tap **Clone**. The detail pane shows a green **"Broadcasting as …"** banner and a fresh peripheral **UUID** — your device is now advertising the cloned profile.
+4. If not yet connected, tap **Connect & Clone**. (The list marks the connected device with a green ✓.)
+5. Once services are listed, tap **Clone**. The detail pane shows a green **"Broadcasting as …"** banner — your device is now advertising the cloned profile.
 6. Tap **Stop** to end the broadcast.
 
 ### Verifying the clone
@@ -256,17 +259,17 @@ Open **nRF Connect** / **LightBlue** (or another phone) and scan: you should see
 
 ## 🔬 Technical Notes
 
-- **Reserved service UUIDs.** iOS blocks peripheral apps from advertising standard/reserved services (Generic Access `1800`, Generic Attribute `1801`, Device Information `180A`, Battery `180F`, Heart Rate `180D`, etc.). `BLEPeripheralManager.reservedServiceUUIDs` lists these and the cloner skips them, reporting how many were skipped.
+- **Reserved service UUIDs.** iOS blocks peripheral apps from advertising standard/reserved services (Generic Access `1800`, Generic Attribute `1801`, Device Information `180A`, Battery `180F`, Heart Rate `180D`, etc.). The native cloner skips these and reports how many were skipped.
 - **RSSI is logarithmic.** Values are in **dBm** and are negative; **closer to 0 = stronger** (e.g. `-73 dBm` is stronger than `-98 dBm`).
-- **Threading.** All `@Published` mutations that drive the UI are dispatched to the **main thread** inside the Core Bluetooth delegate callbacks.
-- **Duplicate handling.** Discoveries are de‑duplicated by `identifier` and updated in place, which avoids both duplicate rows and the noisy "duplicate ID" SwiftUI warning while keeping RSSI fresh.
-- **Access vs. permissions.** A central cannot read a characteristic's GATT *permissions*, so the app **infers** access from the advertised *properties*. The original `CBCharacteristicProperties` are preserved so the clone reproduces behavior faithfully.
+- **Thin native layer, testable Dart.** Property/access strings are derived in Dart from the raw `CBCharacteristicProperties` bitmask, so that logic is covered by plain unit tests with no Bluetooth hardware.
+- **Single multiplexed event stream.** All native → Flutter state flows through one `EventChannel` keyed by a `type` discriminator, keeping the bridge surface small.
+- **Access vs. permissions.** A central cannot read a characteristic's GATT *permissions*, so the app **infers** access from the advertised *properties*. The raw properties are preserved so the clone reproduces behavior faithfully.
 
 ---
 
 ## ⚠️ Limitations & Constraints
 
-- **Profile is cloned, not state.** The clone reproduces the service/characteristic **structure** and properties; it does **not** copy live characteristic *values* — reads return whatever is in the in‑memory `valueStore` (empty until written).
+- **Profile is cloned, not state.** The clone reproduces the service/characteristic **structure** and properties; it does **not** copy live characteristic *values* — reads return whatever is in the in‑memory value store (empty until written).
 - **iOS advertising limits.** Standard/reserved services are skipped, and iOS limits how much advertising data and how many service UUIDs can be broadcast.
 - **No write‑backs to the original.** Writes go to the local store on the clone; they are not forwarded to the original device.
 - **Single active connection.** Connecting to a new device cancels the previous connection.
@@ -292,23 +295,4 @@ This project is intended for **learning, debugging, and security research** on d
 
 ## 🙌 Credits
 
-Created by **Sumit Awasthi**. Built with SwiftUI and Apple's Core Bluetooth framework.
-=======
-# ble_app
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
->>>>>>> bd6571a (Flutter BLE application)
+Created by **Sumit Awasthi**. Built with **Flutter** and Apple's **Core Bluetooth** framework.
