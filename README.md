@@ -1,5 +1,12 @@
 # BLUE — BLE Scanner, GATT Inspector & Device Cloner
+### Screenshots
 
+| BLE GATT Scan, Inspection & Clone Broadcast |
+|---|
+| ![BLE GATT Scan and Clone Broadcast](https://github.com/GEORGIAN86/BLE/blob/main/docs/broadcast.png) |
+| The app scans nearby BLE devices and lists their **name**, **UUID**, and **signal strength (RSSI)**. Selecting a device reveals its complete **GATT profile**, including services, characteristics, their **properties** (Read / Write / Notify, etc.), and inferred access. The app can then **clone** the discovered profile and switch into peripheral mode to re-broadcast the same services under the same name, indicated by the **green "Broadcasting as..."** banner with a **Stop** button to end broadcasting. |
+
+---
 A **Flutter** app that scans for nearby **Bluetooth Low Energy (BLE)** devices, connects to one to inspect its full **GATT** profile (services + characteristics), and can then **clone** that profile — re‑broadcasting the same services and characteristics from your own device under the original device's name.
 
 The app plays **both BLE roles** at once:
@@ -15,14 +22,6 @@ The UI and all application state live in **Flutter/Dart**; the BLE radio work is
 
 [https://drive.google.com/file/d/1kb1yV5EB9P2ypYYzBF4er-6CDlfTailm/view?usp=sharing](https://drive.google.com/file/d/1kb1yV5EB9P2ypYYzBF4er-6CDlfTailm/view?usp=sharing)
 
-### Screenshots
-
-| BLE GATT Scan, Inspection & Clone Broadcast |
-|---|
-| ![BLE GATT Scan and Clone Broadcast](https://github.com/GEORGIAN86/BLE/blob/main/docs/broadcast.png) |
-| The app scans nearby BLE devices and lists their **name**, **UUID**, and **signal strength (RSSI)**. Selecting a device reveals its complete **GATT profile**, including services, characteristics, their **properties** (Read / Write / Notify, etc.), and inferred access. The app can then **clone** the discovered profile and switch into peripheral mode to re-broadcast the same services under the same name, indicated by the **green "Broadcasting as..."** banner with a **Stop** button to end broadcasting. |
-
----
 
 ## ✨ Features
 
