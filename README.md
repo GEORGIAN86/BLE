@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # BLUE — BLE Scanner, GATT Inspector & Device Cloner
 
 A SwiftUI app that scans for nearby **Bluetooth Low Energy (BLE)** devices, connects to one to inspect its full **GATT** profile (services + characteristics), and can then **clone** that profile — re‑broadcasting the same services and characteristics from your own device under the original device's name.
@@ -292,3 +293,22 @@ This project is intended for **learning, debugging, and security research** on d
 ## 🙌 Credits
 
 Created by **Sumit Awasthi**. Built with SwiftUI and Apple's Core Bluetooth framework.
+=======
+# ble_app
+
+A new Flutter project.
+
+## Getting Started
+
+This project is a starting point for a Flutter application.
+
+A few resources to get you started if this is your first Flutter project:
+
+- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
+- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
+>>>>>>> bd6571a (Flutter BLE application)
