@@ -17,10 +17,10 @@ The UI and all application state live in **Flutter/Dart**; the BLE radio work is
 
 ### Screenshots
 
-| 1 — Scan & inspect GATT | 2 — Clone & broadcast |
-|---|---|
-| [![Scanning and inspecting a BLE device's services and characteristics](https://drive.google.com/thumbnail?id=1h829J3N0fY5KmdB0VLJU4zysE-wnntdF&sz=w1920)](https://drive.google.com/file/d/1h829J3N0fY5KmdB0VLJU4zysE-wnntdF/view?usp=sharing) | [![Re-broadcasting the cloned GATT profile](https://drive.google.com/thumbnail?id=1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS&sz=w1920)](https://drive.google.com/file/d/1Aj6cc4Pas5vqdXQnsvNXfZiE5fYhfxvS/view?usp=sharing) |
-| Discovered devices are listed in the sidebar with their **name**, **UUID**, and **signal strength (RSSI)**. Selecting one connects to it and lists every **service** and **characteristic**, including each characteristic's **properties** (Read / Write / Notify…) and inferred **access**. | Tapping **Clone** turns the app into a peripheral that re‑advertises the same services under the same name — note the **green "Broadcasting as …"** banner and the **Stop** button. |
+| BLE GATT Scan, Inspection & Clone Broadcast |
+|---|
+| ![BLE GATT Scan and Clone Broadcast](broadcast.png) |
+| The app scans nearby BLE devices and lists their **name**, **UUID**, and **signal strength (RSSI)**. Selecting a device reveals its complete **GATT profile**, including services, characteristics, their **properties** (Read / Write / Notify, etc.), and inferred access. The app can then **clone** the discovered profile and switch into peripheral mode to re-broadcast the same services under the same name, indicated by the **green "Broadcasting as..."** banner with a **Stop** button to end broadcasting. |
 
 ---
 
